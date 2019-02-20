@@ -19,42 +19,53 @@
 
 <body>
     <div class="container">
-        <div class="input-box">
-            <label for="red">R:</label>
-            <input type="number" name="red" id="red" min="0" max="255" placeholder="0">
-        </div>
-        <div class="input-box">
-            <label for="red">G:</label>
-            <input type="number" name="green" id="green" min="0" max="255" placeholder="0">
-        </div>
-        <div class="input-box">
-            <label for="red">B:</label>
-            <input type="number" name="blue" id="blue" min="0" max="255" placeholder="0">
-        </div>
+        <form action="#">
+            <div class="input-box">
+                <label for="red">R:</label>
+                <input type="number" name="red" id="red" min="0" max="255" placeholder="0" value="0">
+            </div>
+            <div class="input-box">
+                <label for="red">G:</label>
+                <input type="number" name="green" id="green" min="0" max="255" placeholder="0" value="0">
+            </div>
+            <div class="input-box">
+                <label for="red">B:</label>
+                <input type="number" name="blue" id="blue" min="0" max="255" placeholder="0" value="0">
+            </div>
 
-        <div class="input-box">
-            <button class="button" id="submit">提交</button>
-            <button class="button" id="refresh">刷新</button>
-        </div>
+            <div class="input-box">
+                <button class="button" id="submit">提交</button>
+            </div>
+        </form>
     </div>
 
 </body>
 <script>
-    const submitBtn = document.querySelector('#submit'),refreshBtn = document.querySelector('#refresh');
-    submitBtn.addEventListener('click',submit);
-    refreshBtn.addEventListener('click',refresh);
+    const submitBtn = document.querySelector('#submit');
+    submitBtn.addEventListener('click', submit);
 
-    function submit(){
-        let rVal = document.querySelector('#red').value, bVal = document.querySelector('#blue').value, gVal = document.querySelector('#green').value;
-        const json = JSON.stringify({
+    function submit() {
+        let rVal = document.querySelector('#red').value,
+            bVal = document.querySelector('#blue').value,
+            gVal = document.querySelector('#green').value;
+        let json = JSON.stringify({
             red: rVal,
             blue: bVal,
             green: gVal
         });
-        alert('提交成功'+json);
-    }
-    function refresh(){
-
+        fetch('/update', {
+                method: 'POST',
+                body: json
+            })
+            .then(res => res.json())
+            .then(data => {
+                rVal = data.red;
+                gVal = data.gVal;
+                bVal = data.bVal;
+            })
+            .catch(e=>{
+                console.error('ERROR!'+e);
+            })
     }
 </script>
 
