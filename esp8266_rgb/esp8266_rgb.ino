@@ -42,9 +42,6 @@ void setup()
   Serial.println(80);
   //SPIFFS设置
   SPIFFS.begin();
-  File f = SPIFFS.open("/index.html", "r");
-  httpBuff = f.readString();
-  f.close();
   Serial.println("[Debug]->SPIFFS已加载完毕");
 }
 
@@ -62,6 +59,9 @@ void loop()
 void handleRoot()
 {
   Serial.println("[Debug]->Web访问: /");
+  File f = SPIFFS.open("/index.html", "r");
+  httpBuff = f.readString();
+  f.close();
   webServer.send(200, "text/html", httpBuff);
 }
 
@@ -73,8 +73,14 @@ void handleUpdate()
   Serial.println(str);
   //Parse JSON数据
   const size_t capacity = JSON_OBJECT_SIZE(3) + 30;
-  DynamicJsonBuffer jsonBuffer(capacity);
-  JsonObject &root = jsonBuffer.parseObject(str);
+  DynamicJsonDocument jsonBuffer(capacity);
+  DeserializationError error = deserializeJson(jsonBuffer, str);
+  if (error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.c_str());
+    return;
+  }
+  JsonObject root = jsonBuffer.as<JsonObject>();
 
   if (!root.containsKey("red") || !root.containsKey("green") || !root.containsKey("blue"))
   {
@@ -83,6 +89,7 @@ void handleUpdate()
   else
   {
     setColor(root["red"], root["green"], root["blue"]);//设置
+    Serial.println(str);
     webServer.send(200, "application/json", str);
   }
 }
@@ -94,9 +101,15 @@ void handleUpdate()
  */
 void setColor(u8 r, u8 g, u8 b)
 {
+//测试
   analogWrite(R, map(r, 0, 255, 0, 1023));
   analogWrite(G, map(g, 0, 255, 0, 1023));
   analogWrite(B, map(b, 0, 255, 0, 1023));
+
+//  成品使用  
+//  analogWrite(R, map(r, 0, 255, 1023, 0));
+//  analogWrite(G, map(g, 0, 255, 1023, 0));
+//  analogWrite(B, map(b, 0, 255, 1023, 0));
 }
 
 void dazzling()
@@ -106,32 +119,32 @@ void dazzling()
   analogWrite(B, 0);
   for (int i = 0; i < 64; i++)
   {
-    analogWrite(G, map(i, 0, 63, 0, 1023));
+    analogWrite(G, map(i, 0, 63, 1023, 0));
     delay(delayTime);
   }
   for (int i = 64; i > 0; i--)
   {
-    analogWrite(R, map(i - 1, 0, 63, 0, 1023));
+    analogWrite(R, map(i - 1, 0, 63, 1023, 0));
     delay(delayTime);
   }
   for (int i = 0; i < 64; i++)
   {
-    analogWrite(B, map(i, 0, 63, 0, 1023));
+    analogWrite(B, map(i, 0, 63, 1023, 0));
     delay(delayTime);
   }
   for (int i = 64; i > 0; i--)
   {
-    analogWrite(G, map(i - 1, 0, 63, 0, 1023));
+    analogWrite(G, map(i - 1, 0, 63, 1023, 0));
     delay(delayTime);
   }
   for (int i = 0; i < 64; i++)
   {
-    analogWrite(R, map(i, 0, 63, 0, 1023));
+    analogWrite(R, map(i, 0, 63, 1023, 0));
     delay(delayTime);
   }
   for (int i = 64; i > 0; i--)
   {
-    analogWrite(B, map(i - 1, 0, 63, 0, 1023));
+    analogWrite(B, map(i - 1, 0, 63, 1023, 0));
     delay(delayTime);
   }
 }
