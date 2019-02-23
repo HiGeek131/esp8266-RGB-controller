@@ -216,10 +216,10 @@ void getRGBValues() {
   for(u8 i = 0; i < 64; i++) {
     buff[0] = EEPROM.read(0x60+i);
   }
-  color0Num = buff[63];
+  color1Num = buff[63];
   for(u8 i = 0; i < color0Num; i++) {
-    colorGroup0[i][0] = buff[i*3];
-    colorGroup0[i][1] = buff[i*3+1];
-    colorGroup0[i][2] = buff[i*3+2];
+    colorGroup1[i][0] = buff[i*3];
+    colorGroup1[i][1] = buff[i*3+1];
+    colorGroup1[i][2] = buff[i*3+2];
   }
 }
