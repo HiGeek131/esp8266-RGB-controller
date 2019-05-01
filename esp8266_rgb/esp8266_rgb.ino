@@ -4,25 +4,28 @@
 #include <ArduinoJson.h>
 #include "EEPROM.h"
 
-#define R 13
-#define G 14
-#define B 15
-#define KEY 4
+#define R 16
+#define G 5
+#define B 4
+#define KEY 2
 
 IPAddress apIP(192, 168, 1, 1);
 ESP8266WebServer webServer(80);
 String SSID,passwd;
 String httpBuff = "";
 
+// json buffer size
+DynamicJsonDocument jsonBuffer(10240);
+
 // 每个模式下的颜色个数
-u8 mode0Num, mode1Num;
+u8 mode0Num = 15, mode1Num;
 
 // 每个模式下的颜色缓存
 u8 colorGroup0[21][3];  // 模式一可以储存21种颜色
 u8 colorGroup1[25][5];  // 模式二可以储存25种颜色，前三位为颜色信息，后两位为延时信息
 
 // 每个模式下必须的全局变量
-u16 mode0Speed; // 爆闪速度，此为半周期延时，单位为毫秒。
+u16 mode0Speed = 100; // 爆闪速度，此为半周期延时，单位为毫秒。
 u8 mode0BlinkFlag;  // 爆闪标志位
 u8 mode2Speed = 2;  // 滚动速度，此为滚动速度。
 u8 mode0ColorFlag, mode1ColorFlag; // 此为当前模式下颜色所处于的位数。
@@ -46,7 +49,7 @@ void setup()
   // eeprom初始化
   EEPROM.begin(256);
   Serial.println("EEPROM");
-  getRGBValues();
+//  getRGBValues();
   Serial.println("READ");
   SSID = eepromReadStr(0x00);
   Serial.println("READ");
@@ -77,6 +80,8 @@ void setup()
   setColor(0, 0, 0);
 
   attachInterrupt(KEY, keyIntt, FALLING);
+
+  settingsInit();
 }
 
 /* *
@@ -85,6 +90,7 @@ void setup()
 void loop()
 {
   webServer.handleClient();
+  Serial.println(modeFlag);
   switch (modeFlag)
   {
     case 0:
@@ -123,8 +129,6 @@ void handleUpdate()
   Serial.print("[Debug]->Web Post:");
   Serial.println(str);
   //Parse JSON数据
-  const size_t capacity = JSON_OBJECT_SIZE(3) + 30;
-  DynamicJsonDocument jsonBuffer(capacity);
   DeserializationError error = deserializeJson(jsonBuffer, str);
   if (error) {
     Serial.print("deserializeJson() failed: ");
@@ -150,21 +154,23 @@ void handleUpdate()
  * b: 8bit 蓝色
  */
 void keyIntt() {
-  delay(20);
+  delay(50);
   if (digitalRead(KEY) == LOW) {
     switch (modeFlag) {
       case 0:
         if (millis() - timeKey < 1000) {
           mode0BlinkFlag ? mode0BlinkFlag = 0 : mode0BlinkFlag = 1;
+          Serial.println("double click");
+          Serial.println(mode0BlinkFlag);
         }
         timeKey = millis();
         setColor(0, 0, 0);
-        while(digitalRead(KEY) == LOW) {
-          u16 holdTime;
-          delay(10);
-          holdTime ++;
-          if (holdTime = 100) {
+        Serial.println("DEBUG0");
+        while (digitalRead(KEY) == LOW) {
+          Serial.println("DEBUG1");
+          if (millis() - timeKey > 1000) {
             modeFlag ++;
+            break;
           }
         }
         mode0ColorFlag > mode0Num ? mode0ColorFlag = 0 : mode0ColorFlag ++ ;
@@ -172,24 +178,20 @@ void keyIntt() {
 
         case 1:
         setColor(0, 0, 0);
-        while(digitalRead(KEY) == LOW) {
-          u16 holdTime;
-          delay(10);
-          holdTime ++;
-          if (holdTime = 100) {
+        while (digitalRead(KEY) == LOW) {
+          if (millis() - timeKey > 1000) {
             modeFlag ++;
+            break;
           }
         }
         break;
 
         case 2:
         setColor(0, 0, 0);
-        while(digitalRead(KEY) == LOW) {
-          u16 holdTime;
-          delay(10);
-          holdTime ++;
-          if (holdTime = 100) {
+        while (digitalRead(KEY) == LOW) {
+          if (millis() - timeKey > 1000) {
             modeFlag ++;
+            break;
           }
         }
         mode2Speed == 2 ? mode2Speed = 5 : mode2Speed = 2;
@@ -213,17 +215,28 @@ void setColor(u8 r, u8 g, u8 b) {
 }
 
 void mode0() {
-  setColor(colorGroup0[mode1ColorFlag][0], colorGroup0[mode1ColorFlag][1], colorGroup0[mode1ColorFlag][2]);
+  static u8 buff;
+
+  if (buff != mode0ColorFlag) {
+    buff = mode0ColorFlag;
+    Serial.println("mode0");
+    Serial.println(mode0ColorFlag);
+    delay(500);
+    setColor(colorGroup0[mode1ColorFlag][0], colorGroup0[mode1ColorFlag][1], colorGroup0[mode1ColorFlag][2]);
+  }
   if (mode0BlinkFlag) {
+    Serial.println("DEBUG2");
     setColor(0, 0, 0);
     delay(mode0Speed);
     setColor(colorGroup0[mode1ColorFlag][0], colorGroup0[mode1ColorFlag][1], colorGroup0[mode1ColorFlag][2]);
     delay(mode0Speed);
+    Serial.println("DEBUG3");
   }
   
 }
 
 void mode1() {
+  Serial.println("mode1");
   setColor(colorGroup1[mode1ColorFlag][0], colorGroup1[mode1ColorFlag][1], colorGroup1[mode1ColorFlag][2]);
   u16 delayTime = (u16) colorGroup1[mode1ColorFlag][3] << 8;
   delayTime += (u16) colorGroup1[mode1ColorFlag][4];
@@ -232,6 +245,7 @@ void mode1() {
 }
 
 void mode2() {
+  Serial.println("mode2");
   // u8 sinR, sinG, sinB;
   // sinR = map(sin((double) (mode2ColorFlag / 100) * 3.14) * 100, -100, 100, 0, 255);
   // sinR = map(sin((double) (mode2ColorFlag / 100) * 3.14 + 3.14/3) * 100, -100, 100, 0, 255);
@@ -313,24 +327,48 @@ void eepromWriteStr(u16 addr, String str) {
 /* *
  * 读取两组RGB数据
  * */
-void getRGBValues() {
-  u8 buff[64];
-  for(u8 i = 0; i < 64; i++) {
-    buff[i] = EEPROM.read(0x20+i);
+//void getRGBValues() {
+//  u8 buff[64];
+//  for(u8 i = 0; i < 64; i++) {
+//    buff[i] = EEPROM.read(0x20+i);
+//  }
+//  mode0Num = buff[63];
+//  for(u8 i = 0; i < mode0Num; i++) {
+//    colorGroup0[i][0] = buff[i*3];
+//    colorGroup0[i][1] = buff[i*3+1];
+//    colorGroup0[i][2] = buff[i*3+2];
+//  }
+//  for(u8 i = 0; i < 128; i++) {
+//    buff[i] = EEPROM.read(0x60+i);
+//  }
+//  mode1Num = buff[127];
+//  for(u8 i = 0; i < mode1Num; i++) {
+//    colorGroup1[i][0] = buff[i*3];
+//    colorGroup1[i][1] = buff[i*3+1];
+//    colorGroup1[i][2] = buff[i*3+2];
+//  }
+//}
+
+void settingsInit() {
+  File f = SPIFFS.open("/settings.txt", "r");
+  if (!f) {
+    Serial.println("Open file failed");
   }
-  color0Num = buff[63];
-  for(u8 i = 0; i < color0Num; i++) {
-    colorGroup0[i][0] = buff[i*3];
-    colorGroup0[i][1] = buff[i*3+1];
-    colorGroup0[i][2] = buff[i*3+2];
+  else {
+    String data = f.readString();
+    Serial.println(data);
+    DeserializationError error = deserializeJson(jsonBuffer, data);
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+      return;
+    }
+    JsonObject root = jsonBuffer.as<JsonObject>();
+    String strBuffer = root["color0Num"];
+    Serial.print("color0Num : ");
+    Serial.println(strBuffer.toInt());
+    String strBuffer1 = root["color0Data"]["0"]["r"];
+    Serial.println(strBuffer1.toInt());
   }
-  for(u8 i = 0; i < 128; i++) {
-    buff[i] = EEPROM.read(0x60+i);
-  }
-  color1Num = buff[127];
-  for(u8 i = 0; i < color0Num; i++) {
-    colorGroup1[i][0] = buff[i*3];
-    colorGroup1[i][1] = buff[i*3+1];
-    colorGroup1[i][2] = buff[i*3+2];
-  }
+  f.close();
 }

@@ -1,0 +1,1 @@
+{"ssid": "HiGeek_Studio", "password": "1145141919"}
